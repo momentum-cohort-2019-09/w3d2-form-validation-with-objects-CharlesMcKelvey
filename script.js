@@ -11,46 +11,30 @@ function querys(selector) {
     return document.querySelectorAll(selector)
 }
 
-function markInvalid(field) {
-    let parent = field.closest(".input-field")
-    parent.classList.remove('input-valid')
-    parent.classList.add('input-invalid')
-    let childError = document.createElement('p')
-    // Adding class' from Shoelace
-    childError.classList.add("text-danger", "input-hint")
-    childError.innerHTML = errorMessage
-    // Puts that kiddo below the parent
-    parent.appendChild(childError)
-}
 
-function markValid(field) {
-    let parent = field.closest(".input-field")
-    parent.classList.remove('input-invalid')
-    parent.classList.add('input-valid')
-}
 
 // VALIDATION SECTION START
 
-function validateName(field) {
+function validateName(field, errorMessage) {
     if (!field.value.trim()) {
         console.log("not good")
-        markInvalid(field)
+        markInvalid(field, errorMessage)
     } else {
         console.log("you good")
         markValid(field)
     }
 }
 
-function validateCar(field) {
+function validateCar(field, errorMessage) {
     if (parseInt(field.value) >= 1900 && parseInt(field.value) <= now.getFullYear()) {
         markValid(field)
         validity++
     } else {
-        markInvalid(field)
+        markInvalid(field, errorMessage)
     }
 }
 
-function validateDate(field) {
+function validateDate(field, errorMessage) {
     if (isDateTodayorLater(field.value)) {
         markValid(field)
         validity++
@@ -59,7 +43,7 @@ function validateDate(field) {
     }
 }
 
-function validateDays(field) {
+function validateDays(field, errorMessage) {
     let fieldNumber = Number(field.value)
     if (fieldNumber >= 1 && fieldNumber <= 30) {
         markValid(field)
@@ -69,7 +53,7 @@ function validateDays(field) {
     }
 }
 
-function validateCredit(field) {
+function validateCredit(field, errorMessage) {
     if (validateCardNumber(field.value)) {
         markValid(field)
         validity++
@@ -78,7 +62,7 @@ function validateCredit(field) {
     }
 }
 
-function validateCVV(field) {
+function validateCVV(field, errorMessage) {
     let fieldNumber = Number(field.value)
     if (field.value.length === 3 && !isNaN(fieldNumber)) {
         markValid(field)
@@ -88,7 +72,7 @@ function validateCVV(field) {
     }
 }
 
-function validateExpiration(field) {
+function validateExpiration(field, errorMessage) {
     let expire = field.value.split('/')
     expire[0] = Number(expire[0])
     expire[1] = Number(expire[1])
@@ -100,6 +84,14 @@ function validateExpiration(field) {
         validity++
     } else {
         markInvalid(field, errorMessage)
+    }
+}
+
+function validatePresence(field, errorMessage) {
+    if (!field.value.trim()) {
+        markInvalid(field, errorMessage)
+    } else {
+        markValid(field)
     }
 }
 
@@ -135,70 +127,84 @@ function luhnCheck(val) {
 
 // add a dictionary with the id key's and validation values
 let validations = {
-    "name":  validateName,
-    "car-info": validateCar,
-    "start-date": validateDate,
-    "days": validateDays,
-    "credit-card": validateCredit,
-    "cvv": validateCVV,
-    "expiration": validateExpiration,
+    "name":  [validatePresence, validateName], // 
+    "car-info": [validatePresence, validateCar], // 
+    "start-date": [validateDate], // 
+    "days": [validatePresence, validateDays], // 
+    "credit-card": [validatePresence, validateCredit], // 
+    "cvv": [validatePresence, validateCVV],
+    "expiration": [validateExpiration],
 }
 
 // CLASS SECTION START
-class Form {
-    constructor() {
-        this.fields = [] // NodeList - all of your inputs
+class Validator {
+    constructor(test, errorMessage) { 
+        this.test = test // This is a defined function when instantiated
+        this.errorMessage = errorMessage || "is required" // This is a specific error message for that validate function
     }
 
-    addField(field) {
-        return this.fields.push(field)
+    validate(value) {
+        return this.test(value)
     }
-
-    getTotal() {
-
-    }
-
-    checkAllValid() {
-        // if all valid, then getTotal()
-        // Check via the validity points 
-    }
-
-    
 }
 
+
+
+let validatePresence = new Validate(value => !!value, "must be filled out") 
+// The !! will switch it from false to true to false, 
+// essentially giving you the value it was while also being able to test truthiness/falsiness
+let validateCarInfo = new Validate(function(number) {
+    if(number < 1900 && number > now.getFullYear()) {
+        
+    } else {
+}, " is invalid. The given year must be between 1900 and this year.")
 class Field { // Field should be the input tag 
-    constructor(field, validator) {
+    constructor(field, validators) {
         this.field = field
-        this.id = field.id;
-        this.value = field.value.trim();
-        this.validator = validator
+        this.validators = validators || []
     }
 
-    validation() {
-        return this.validator(field)
+    validate() {
+        const value = this.field.value
     }
+
+    markInvalid() {
+        let parent = this.field.closest(".input-field")
+        parent.classList.remove('input-valid')
+        parent.classList.add('input-invalid')
+        let childError = document.createElement('p')
+        // Adding class' from Shoelace
+        childError.classList.add("text-danger", "input-hint")
+        childError.innerHTML = errorMessage
+        // Puts that kiddo below the parent
+        parent.appendChild(childError)
+}
+
+    markValid() {
+        let parent = this.field.closest(".input-field")
+        parent.classList.remove('input-invalid')
+        parent.classList.add('input-valid')
+}
 
 }
 
 // CLASS SECTION END
 
-query('#submit-button').addEventListener('submit', function(event) {
-    event.preventDefault()
-
-      
-    let tags = querys('input') // Get all of those fields 
-    let inputs = new Form() // Create the form where we will have all of our fields stored
+function gather() {
+    let tags = querys('.input-field')
+    // Get all of those fields 
+    
     console.log("This is your form", inputs)
     let keys = Object.keys(validations) // Get those keys out of the validations dictionary 
     console.log("These are your keys", keys)
 
-    for(let i = 0; i < tags.length; i++) { // Work through it 
-        if (tags[i].id in keys) { // For whatever reason, this isn't returning true even tho I thought the "in" operator would work. 
+    for (let i = 0; i < tags.length; i++) { // Work through it 
+        if (keys.includes(tags[i].id)) { // For whatever reason, this isn't returning true even tho I thought the "in" operator would work. 
             console.log(tags[i])  // None of this happens but when I check, tags[i].id IS IN keys so I don't know what I'm doing wrong
-            let field = new Field(tags[i], validations[tags[i].id])
+            let field = new Field(tags[i], validations[tags[i].id]) // This will grab it no matter where it is
             console.log(field)
-            inputs.addField(field) // Append it to the form each time. 
-        } 
+            form.addField(field) // Append it to the form each time. 
+        }
         // let key = validDict[keys[i]]
         // let field = new Field(inputs[i], validDict[i][inputs[i]])
         // We have the inputs and the keys
@@ -208,20 +214,20 @@ query('#submit-button').addEventListener('submit', function(event) {
         // How to check for truthiness 
     }
     console.log("This is your form after for-loop", inputs)
+}
 
-    if (validity === 9) {
-        let numOfDays = document.querySelector('#days')
-        let startDate = query('#start-date')
-        let total = sumOfDays(numOfDays, startDate)
-        let totalDiv = query('#total')
-        let totalEle = document.createElement('div')
-        totalEle.classList.add('text-bold', 'text-success')
-        totalEle.innerHTML = total + " is your total for parking"
-        totalDiv.appendChild(totalEle)
-        validity = 0
-    } else {
-        let errorChild = query('.text-success')
-        errorChild.remove()
-        validity = 0
-    }
+query('#submit-button').addEventListener('submit', function(event) {
+    event.preventDefault()
+    // Go through and validate each field
+    // Clear errors
+    // If all valid checkAllValid(), 
+    //     getTotal for parking
+    //     Set validty to 0
+    //     Question: in a separate class, can we adjust another classes constructor value? 
+    //               I want to increase validity as each field is valid and set back to 0 otherwise. 
+    // Else, 
+    //     Mark those that are invalid as such.
+    //     Set validity to 0
+
+    
 })
